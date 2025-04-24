@@ -1,0 +1,10 @@
+ARG DOCKER_VERSION=23.0.5
+
+FROM docker:${DOCKER_VERSION}-dind
+
+ARG USE_TSINGHUA_SRC="true"
+ARG USE_ALIYUN_PIP_SRC="true"
+
+COPY base_env_build.sh /usr/local/bin
+
+RUN base_env_build.sh
