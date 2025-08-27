@@ -15,10 +15,22 @@ self_path=$(
 cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/kubelet" "$self_path/kubelet"
 cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/kubectl" "$self_path/kubectl"
 cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/kubeadm" "$self_path/kubeadm"
+# 针对不同的版本，还需要拷贝不同的内容，以顺利构建
+
+if [ "$K8S_VERSION" = "1.12.0" ]; then
+    cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/ld-2.24.so" "$self_path/ld-2.24.so"
+    cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/libc-2.24.so" "$self_path/libc-2.24.so"
+    cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/libdl-2.24.so" "$self_path/libdl-2.24.so"
+    cp "$self_path/../../kubernetes/_output/local/bin/linux/amd64/libpthread-2.24.so" "$self_path/libpthread-2.24.so"
+fi
 
 # 检查 ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:base-$DOCKER_VERSION 镜像是否存在，不存在则构建
 cd "$self_path"
+# 根据不同的 docker 版本和 kuberntes 版本需要选择不同的构建脚本，因为不同的版本之间可能存在特有的流程
 docker pull "$DOCKER_REGISTRY/k8s-in-dind:base-$DOCKER_VERSION" || docker build -f Dockerfile-base --build-arg DOCKER_VERSION=$DOCKER_VERSION -t "$DOCKER_REGISTRY/k8s-in-dind:base-$DOCKER_VERSION" .
-docker build --no-cache --build-arg DOCKER_VERSION=$DOCKER_VERSION --build-arg DOCKER_REGISTRY=$DOCKER_REGISTRY -t "$DOCKER_REGISTRY/k8s-in-dind:$DOCKER_VERSION-$K8S_VERSION" .
+docker build -f AutoDockerfile_${DOCKER_VERSION}_${K8S_VERSION} --no-cache --build-arg DOCKER_VERSION=$DOCKER_VERSION --build-arg DOCKER_REGISTRY=$DOCKER_REGISTRY -t "$DOCKER_REGISTRY/k8s-in-dind:$DOCKER_VERSION-$K8S_VERSION" .
 rm -rf "$self_path/kubelet" "$self_path/kubectl" "$self_path/kubeadm"
+if [ "$K8S_VERSION" = "1.12.0" ]; then
+    rm -rf "$self_path/ld-2.24.so" "$self_path/libc-2.24.so" "$self_path/libdl-2.24.so" "$self_path/libpthread-2.24.so"
+fi
 cd -

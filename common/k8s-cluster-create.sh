@@ -9,7 +9,13 @@ CNI_CATEGORY=${CNI_CATEGORY:-"calico"}
 CNI_VERSION=${CNI_VERSION:-"calico-v3.29.3"}
 
 if [ $KUBEADM_INIT_WORKFLOW = 'enable' ]; then
-    kubeadm -v=5 init --config /kubeadm_install/kubeadm_init.yaml --ignore-preflight-errors=Swap,SystemVerification
+    # 根据版本来使用不同的启动流程
+    if [ $KUBEADM_K8S_VERSION = '1.12.0' ]
+    then
+        kubeadm -v=5 init --config /kubeadm_install/kubeadm_init.yaml --ignore-preflight-errors=Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
+    else
+        kubeadm -v=5 init --config /kubeadm_install/kubeadm_init.yaml --ignore-preflight-errors=Swap,SystemVerification
+    fi
     # 一旦完成创建，还需要应用 cni 插件，完成部署
     if [ $? -eq 0 ]; then
         mkdir -p $HOME/.kube
@@ -21,5 +27,11 @@ if [ $KUBEADM_INIT_WORKFLOW = 'enable' ]; then
         echo "Faield to create kubernetes cluster, will not continue to create cni plugin."
     fi
 elif [ $KUBEADM_JOIN_WORKFLOW = 'enable' ]; then
-    kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml --ignore-preflight-errors=Swap,SystemVerification
+    # 根据版本来使用不同的启动流程
+    if [ $KUBEADM_K8S_VERSION = '1.12.0' ]
+    then
+        kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml --ignore-preflight-errors=Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
+    else
+        kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml --ignore-preflight-errors=Swap,SystemVerification
+    fi
 fi

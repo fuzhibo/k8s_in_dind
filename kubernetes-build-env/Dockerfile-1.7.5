@@ -1,0 +1,9 @@
+FROM golang:1.7.5
+
+# kubernetes source path
+VOLUME [ "/root/workplace" ]
+# GOPATH path
+VOLUME [ "/go" ]
+
+# install needed packages
+COPY --chmod=0777 rsync /usr/local/bin/

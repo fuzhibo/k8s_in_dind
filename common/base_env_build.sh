@@ -16,7 +16,8 @@ apk add --no-cache \
     curl \
     socat \
     conntrack-tools \
-    python3
+    python3 \
+    findutils
 
 # Initialize USE_ALIYUN_PIP_SRC with a default value to avoid undefined errors.
 USE_ALIYUN_PIP_SRC="${USE_ALIYUN_PIP_SRC:-true}"
@@ -26,13 +27,17 @@ if [ "$USE_ALIYUN_PIP_SRC" = "true" ]; then
     mkdir -p ~/.pip
     cat >~/.pip/pip.conf <<EOF
 [global]
-index-url = https://mirrors.aliyun.com/pypi/simple/
+index-url = https://pypi.mirrors.ustc.edu.cn/simple/
 [install]
-trusted-host = mirrors.aliyun.com
+trusted-host = pypi.mirrors.ustc.edu.cn
 EOF
 fi
 
 # Upgrade pip to the latest version and install required Python packages.
-python3 -m ensurepip --upgrade
+if [ $DOCKER_VERSION != "18.09.0" ]
+then
+    # 有些版本的 python 并不支持后续添加的一些特性，这里就通过分支来筛选不支持功能的版本
+    python3 -m ensurepip --upgrade
+fi
 python3 -m pip install --upgrade pip
 python3 -m pip install pyyaml tomli tomli_w
