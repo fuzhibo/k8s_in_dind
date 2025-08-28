@@ -2,23 +2,41 @@
 set -eu
 # 根据传入的配置参数生成 Dockerfile 用于不同版本的构建
 : ${DOCKER_VERSION:=18.09.0}
-: ${K8S_VERSION:=1.12.0}
+: ${K8S_VERSION:=v1.12.0}
 : ${DOCKER_REGISTRY:=ccr.ccs.tencentyun.com/fuzhibo}
 : ${DOCKERFILE_PREFIX:="AutoDockerfile"}
 : ${CONTAINERD_INDIVIDUALLY_START:="false"}
+: ${CRICTL_TOOL_NEEDED:="false"}
+
+# 对一些参数进行检测，主要是根据版本本身来进行调整
+if [ $K8S_VERSION = 'v1.16.15' ]
+then
+CRICTL_TOOL_NEEDED='true'
+fi
 
 CONTEXTS=""
 
-if [ $CONTAINERD_INDIVIDUALLY_START = 'true' ]; then
+if [ $CONTAINERD_INDIVIDUALLY_START = 'true' ]
+then
 CONTAINERD_TOOL_CONTEXTS="
 COPY docker-entrypoint.sh /usr/local/bin
 COPY containerd-entrypoint.sh /usr/local/bin
 COPY dockerd-entrypoint.sh /usr/local/bin
-COPY crictl.yaml /etc/crictl.yaml
-COPY crictl-install.sh /usr/local/bin
 "
 CONTEXTS="$CONTEXTS
 $CONTAINERD_TOOL_CONTEXTS
+"
+fi
+
+CRICTL_TOOL_CONTEXTS="
+COPY crictl.yaml /etc/crictl.yaml
+COPY crictl-install.sh /usr/local/bin
+"
+
+if [ $CRICTL_TOOL_NEEDED = 'true' ]
+then
+CONTEXTS="$CONTEXTS
+$CRICTL_TOOL_CONTEXTS
 "
 fi
 
@@ -52,7 +70,7 @@ COPY kubeadm /usr/bin
 COPY kubectl /usr/bin
 "
 
-if [ $K8S_VERSION = '1.12.0' ]
+if [ $K8S_VERSION = 'v1.12.0' ]
 then
 K8S_BIN_EXT_CONTEXTS="
 RUN mkdir -p /lib/x86_64-linux-gnu && mkdir -p /lib64
@@ -61,6 +79,20 @@ COPY ld-2.24.so /lib/x86_64-linux-gnu
 COPY libdl-2.24.so /lib/x86_64-linux-gnu
 COPY libpthread-2.24.so /lib/x86_64-linux-gnu
 RUN ln -s /lib/x86_64-linux-gnu/libc-2.24.so /lib/x86_64-linux-gnu/libc.so.6 && ln -s /lib/x86_64-linux-gnu/libdl-2.24.so /lib/x86_64-linux-gnu/libdl.so.2 && ln -s /lib/x86_64-linux-gnu/libpthread-2.24.so /lib/x86_64-linux-gnu/libpthread.so.0 && ln -s /lib/x86_64-linux-gnu/ld-2.24.so /lib64/ld-linux-x86-64.so.2
+"
+K8S_BIN_CONTEXTS="
+$K8S_BIN_CONTEXTS
+$K8S_BIN_EXT_CONTEXTS
+"
+elif [ $K8S_VERSION = 'v1.16.15' ]
+then
+K8S_BIN_EXT_CONTEXTS="
+RUN mkdir -p /lib/x86_64-linux-gnu && mkdir -p /lib64
+COPY libc-2.28.so /lib/x86_64-linux-gnu
+COPY ld-2.28.so /lib/x86_64-linux-gnu
+COPY libdl-2.28.so /lib/x86_64-linux-gnu
+COPY libpthread-2.28.so /lib/x86_64-linux-gnu
+RUN ln -s /lib/x86_64-linux-gnu/libc-2.28.so /lib/x86_64-linux-gnu/libc.so.6 && ln -s /lib/x86_64-linux-gnu/libdl-2.28.so /lib/x86_64-linux-gnu/libdl.so.2 && ln -s /lib/x86_64-linux-gnu/libpthread-2.28.so /lib/x86_64-linux-gnu/libpthread.so.0 && ln -s /lib/x86_64-linux-gnu/ld-2.28.so /lib64/ld-linux-x86-64.so.2
 "
 K8S_BIN_CONTEXTS="
 $K8S_BIN_CONTEXTS

@@ -19,19 +19,24 @@ KUBEADM_JOIN_CONFIG_FILE = "/kubeadm_install/kubeadm_join.yaml"
 
 
 def modify_kubeadm_init_config_InitConfiguration(kubeadm_init_config):
-    kubeadm_init_config["apiEndpoint"]["advertiseAddress"] = "0.0.0.0"
-    # 这里我们使用默认的 docker 作为底层引擎
-    # kubeadm_init_config["nodeRegistration"]["criSocket"] = "unix:///run/containerd/containerd.sock"
-    # 这里我们直接用 hostname 作为 node name
+    k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.12.0")
     hostname = os.environ.get("HOSTNAME", "k8s-master")
-    if hostname == "k8s-master":
-        logger.warning(
-            f"Will use default node name {hostname} as this node name.")
-    kubeadm_init_config["nodeRegistration"]["name"] = hostname
-    # 1.12 版本 k8s 不支持的设置就不折腾了
-    # k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
-    # kubeadm_init_config["provider-id"] = f"k8s-in-dind://containerd/k8s-{k8sver}-cluster/k8s-{k8sver}-cluster-control-plane"
-    # kubeadm_init_config["skipPhases"] = ["preflight"]
+    if k8sver == "v1.12.0":
+        kubeadm_init_config["apiEndpoint"]["advertiseAddress"] = "0.0.0.0"
+        # 这里我们使用默认的 docker 作为底层引擎
+        # 这里我们直接用 hostname 作为 node name
+        if hostname == "k8s-master":
+            logger.warning(
+                f"Will use default node name {hostname} as this node name.")
+        kubeadm_init_config["nodeRegistration"]["name"] = hostname
+    elif k8sver == "v1.16.15":
+        kubeadm_init_config["localAPIEndpoint"]["advertiseAddress"] = "0.0.0.0"
+        # kubeadm_init_config["nodeRegistration"]["criSocket"] = "/var/run/docker.sock"
+        # 这里我们直接用 hostname 作为 node name
+        if hostname == "k8s-master":
+            logger.warning(
+                f"Will use default node name {hostname} as this node name.")
+        kubeadm_init_config["nodeRegistration"]["name"] = hostname
 
 
 def modify_kubeadm_init_config_ClusterConfiguration(kubeadm_init_config):
@@ -43,22 +48,6 @@ def modify_kubeadm_init_config_ClusterConfiguration(kubeadm_init_config):
         certSANs = [certSANs]
     hostname = os.environ.get("HOSTNAME", "k8s-master")
     certSANs.append(hostname)
-    # kubeadm_init_config["apiServer"]["certSANs"] = certSANs
-    # 这个 api server 的 cert sans 在 1.12 版本需要单独填写
-    kubeadm_init_config["apiServerCertSANs"] = certSANs
-    # 在 1.12 版本下，这个 apiserver 的扩展参数是单独使用 apiServerExtraArgs 来存放
-    # if "extraArgs" not in kubeadm_init_config["apiServer"]:
-    #     kubeadm_init_config["apiServer"]["extraArgs"] = []
-    # kubeadm_init_config["apiServer"]["extraArgs"].append(
-    #     {"name": "authorization-mode", "value": "Node,RBAC"})
-    # kubeadm_init_config["apiServer"]["extraArgs"].append(
-    #     {"name": "enable-aggregator-routing", "value": "true"})
-    kubeadm_init_config["apiServerExtraArgs"] = {
-        "authorization-mode": "Node,RBAC",
-        "enable-aggregator-routing": "true"
-    }
-    # 这个 enable-hostpath-provisioner 在 1.12 版本中只能通过 controller-manager 启动参数的形式使能
-    # kubeadm_init_config["controllerManager"]["enable-hostpath-provisioner"] = "true"
     k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.12.0")
     imgregistry = os.environ.get(
         "KUBEADM_IMG_REGISTRY", "registry.aliyuncs.com/google_containers")
@@ -66,10 +55,36 @@ def modify_kubeadm_init_config_ClusterConfiguration(kubeadm_init_config):
         "KUBEADM_SVC_SUBNET", "10.97.0.0/16")
     podsubnet = os.environ.get(
         "KUBEADM_POD_SUBNET", "10.245.0.0/16")
-    kubeadm_init_config["imageRepository"] = imgregistry
-    kubeadm_init_config["kubernetesVersion"] = k8sver
-    kubeadm_init_config["networking"]["serviceSubnet"] = svcsubnet
-    kubeadm_init_config["networking"]["podSubnet"] = podsubnet
+    if k8sver == "v1.12.0":
+        # 这个 api server 的 cert sans 在 1.12 版本需要单独填写
+        kubeadm_init_config["apiServerCertSANs"] = certSANs
+        # 在 1.12 版本下，这个 apiserver 的扩展参数是单独使用 apiServerExtraArgs 来存放
+        kubeadm_init_config["apiServerExtraArgs"] = {
+            "authorization-mode": "Node,RBAC",
+            "enable-aggregator-routing": "true"
+        }
+        # 这个 enable-hostpath-provisioner 在 1.12 版本中只能通过 controller-manager 启动参数的形式使能
+        kubeadm_init_config["imageRepository"] = imgregistry
+        kubeadm_init_config["kubernetesVersion"] = k8sver
+        kubeadm_init_config["networking"]["serviceSubnet"] = svcsubnet
+        kubeadm_init_config["networking"]["podSubnet"] = podsubnet
+    elif k8sver == "v1.16.15":
+        kubeadm_init_config["apiServer"]["certSANs"] = certSANs
+        # 1.16.15 在部分配置还是和最新的有所区别
+        if "extraArgs" not in kubeadm_init_config["apiServer"]:
+            kubeadm_init_config["apiServer"]["extraArgs"] = {}
+            # kubeadm_init_config["apiServer"]["extraArgs"] = []
+        # kubeadm_init_config["apiServer"]["extraArgs"].append(
+        #     {"name": "authorization-mode", "value": "Node,RBAC"})
+        # kubeadm_init_config["apiServer"]["extraArgs"].append(
+        #     {"name": "enable-aggregator-routing", "value": "true"})
+        kubeadm_init_config["apiServer"]["extraArgs"]["authorization-mode"] = "Node,RBAC"
+        kubeadm_init_config["apiServer"]["extraArgs"]["enable-aggregator-routing"] = "true"
+        kubeadm_init_config["controllerManager"]["enable-hostpath-provisioner"] = "true"
+        kubeadm_init_config["imageRepository"] = imgregistry
+        kubeadm_init_config["kubernetesVersion"] = k8sver
+        kubeadm_init_config["networking"]["serviceSubnet"] = svcsubnet
+        kubeadm_init_config["networking"]["podSubnet"] = podsubnet
 
 
 def modify_kubeadm_init_config_KubeletConfiguration(kubeadm_init_config):
@@ -102,54 +117,44 @@ def modify_kubeadm_init_config_KubeProxyConfiguration(kubeadm_init_config):
 
 
 def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
-    advertiseAddress = os.environ.get("ADVERTISE_ADDRESS", "127.0.0.1")
-    # bindPort = os.environ.get("BIND_PORT", 6443)
-    # kubeadm_join_config["apiVersion"] = "kubeadm.k8s.io/v1beta3"
-    # kubeadm_join_config["controlPlane"] = {
-    #     "localAPIEndpoint": {
-    #         "advertiseAddress": advertiseAddress,
-    #         "bindPort": int(bindPort)
-    #     }
-    # }
-    # kubeadm_join_config["discovery"]["bootstrapToken"]["apiServerEndpoint"] = os.environ.get(
-    # "API_SERVER_ENDPOINT", "127.0.0.1:6443")
-    # 1.12 的配置和后期的不一样，所以这里要区分版本
+    k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.12.0")
     apiserver_endpoint = os.environ.get(
         "API_SERVER_ENDPOINT", "127.0.0.1:6443")
-    kubeadm_join_config["apiEndpoint"]["advertiseAddress"] = advertiseAddress
     bootstrap_token = os.environ.get("BOOTSTRAP_TOKEN", "")
-    if bootstrap_token:
-        # kubeadm_join_config["discovery"]["bootstrapToken"]["token"] = bootstrap_token
-        # kubeadm_join_config["discovery"]["bootstrapToken"]["unsafeSkipCAVerification"] = True
-        # kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"] = []
-        kubeadm_join_config["discoveryToken"] = bootstrap_token
-        kubeadm_join_config["discoveryTokenAPIServers"] = [apiserver_endpoint]
-        # 在 1.12 的 kubeadm join 配置中 discoveryToken、tlsBootstrapToken、token 这三个字段虽然都可以填写 token
-        # 但是使用场景会有区别，所以为了避免问题，可以将这三个字段都设置为同一个 token，保证兼容性和自动化脚本的健壮性。
-        kubeadm_join_config["tlsBootstrapToken"] = bootstrap_token
-        kubeadm_join_config["token"] = bootstrap_token
-    # caCertHashes = os.environ.get("CA_CERT_HASHES", "")
-    # if caCertHashes:
-    #     if "," in caCertHashes:
-    #         for caCertHash in caCertHashes.split(","):
-    #             # kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
-    #             #     caCertHash)
-    #     else:
-        # kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
-        #     caCertHashes)
-        # kubeadm_join_config["discovery"] = {
-        #     "bootstrapToken": {
-        #         "apiServerEndpoint": os.environ.get("API_SERVER_ENDPOINT", "127.0.0.1:6443"),
-        #         "token": os.environ.get("BOOTSTRAP_TOKEN", ""),
-        #         "unsafeSkipCAVerification": True
-        #     }
+    if k8sver == "v1.12.0":
+        advertiseAddress = os.environ.get("ADVERTISE_ADDRESS", "127.0.0.1")
+        # 1.12 的配置和后期的不一样，所以这里要区分版本
+        kubeadm_join_config["apiEndpoint"]["advertiseAddress"] = advertiseAddress
+        if bootstrap_token:
+            kubeadm_join_config["discoveryToken"] = bootstrap_token
+            kubeadm_join_config["discoveryTokenAPIServers"] = [
+                apiserver_endpoint]
+            # 在 1.12 的 kubeadm join 配置中 discoveryToken、tlsBootstrapToken、token 这三个字段虽然都可以填写 token
+            # 但是使用场景会有区别，所以为了避免问题，可以将这三个字段都设置为同一个 token，保证兼容性和自动化脚本的健壮性。
+            kubeadm_join_config["tlsBootstrapToken"] = bootstrap_token
+            kubeadm_join_config["token"] = bootstrap_token
+        hostname = os.environ.get("HOSTNAME", "k8s-node")
+        kubeadm_join_config["nodeRegistration"] = {
+            "name": hostname,
+        }
+    elif k8sver == "v1.16.15":
+        kubeadm_join_config["discovery"]["bootstrapToken"]["apiServerEndpoint"] = apiserver_endpoint
+        if bootstrap_token:
+            kubeadm_join_config["discovery"]["bootstrapToken"]["token"] = bootstrap_token
+        kubeadm_join_config["discovery"]["bootstrapToken"]["unsafeSkipCAVerification"] = True
+        kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"] = []
+        caCertHashes = os.environ.get("CA_CERT_HASHES", "")
+        if caCertHashes:
+            if "," in caCertHashes:
+                for caCertHash in caCertHashes.split(","):
+                    kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
+                        caCertHash)
+            else:
+                kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
+                    caCertHashes)
+        # kubeadm_join_config["nodeRegistration"] = {
+        #     "criSocket": "/var/run/docker.sock"
         # }
-        # k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
-    hostname = os.environ.get("HOSTNAME", "k8s-node")
-    kubeadm_join_config["nodeRegistration"] = {
-        "name": hostname,
-    }
-    # kubeadm_join_config["skipPhases"] = ["preflight"]
 
     # 获取环境变量
 if os.environ.get("KUBEADM_INIT_WORKFLOW", "disable").lower() == "enable":

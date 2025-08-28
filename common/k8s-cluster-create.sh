@@ -6,11 +6,11 @@ set -eu
 KUBEADM_INIT_WORKFLOW=${KUBEADM_INIT_WORKFLOW:-"disable"}
 KUBEADM_JOIN_WORKFLOW=${KUBEADM_JOIN_WORKFLOW:-"disable"}
 CNI_CATEGORY=${CNI_CATEGORY:-"calico"}
-CNI_VERSION=${CNI_VERSION:-"calico-v3.29.3"}
+CNI_VERSION=${CNI_VERSION:-"calico_v3.29"}
 
 if [ $KUBEADM_INIT_WORKFLOW = 'enable' ]; then
     # 根据版本来使用不同的启动流程
-    if [ $KUBEADM_K8S_VERSION = '1.12.0' ]
+    if [ $KUBEADM_K8S_VERSION = 'v1.12.0' ] || [ $KUBEADM_K8S_VERSION = 'v1.16.15' ]
     then
         kubeadm -v=5 init --config /kubeadm_install/kubeadm_init.yaml --ignore-preflight-errors=Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
     else
@@ -28,7 +28,7 @@ if [ $KUBEADM_INIT_WORKFLOW = 'enable' ]; then
     fi
 elif [ $KUBEADM_JOIN_WORKFLOW = 'enable' ]; then
     # 根据版本来使用不同的启动流程
-    if [ $KUBEADM_K8S_VERSION = '1.12.0' ]
+    if [ $KUBEADM_K8S_VERSION = 'v1.12.0' ] || [ $KUBEADM_K8S_VERSION = 'v1.16.15' ]
     then
         kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml --ignore-preflight-errors=Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
     else

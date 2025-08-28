@@ -117,7 +117,8 @@ def modify_kubeadm_init_config_KubeletConfiguration(kubeadm_init_config):
         "nodefs.inodesFree": "5%",
     }
     kubeadm_init_config["evictionPressureTransitionPeriod"] = "5m0s"
-    kubeadm_init_config["maxPods"] = os.environ.get("KUBELET_MAXPODS", "110")
+    kubeadm_init_config["maxPods"] = int(
+        os.environ.get("KUBELET_MAXPODS", "110"))
 
 
 def modify_kubeadm_init_config_KubeProxyConfiguration(kubeadm_init_config):
@@ -132,15 +133,6 @@ def modify_kubeadm_init_config_KubeProxyConfiguration(kubeadm_init_config):
 
 
 def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
-    advertiseAddress = os.environ.get("ADVERTISE_ADDRESS", "127.0.0.1")
-    # bindPort = os.environ.get("BIND_PORT", 6443)
-    # kubeadm_join_config["apiVersion"] = "kubeadm.k8s.io/v1beta3"
-    # kubeadm_join_config["controlPlane"] = {
-    #     "localAPIEndpoint": {
-    #         "advertiseAddress": advertiseAddress,
-    #         "bindPort": int(bindPort)
-    #     }
-    # }
     kubeadm_join_config["discovery"]["bootstrapToken"]["apiServerEndpoint"] = os.environ.get(
         "API_SERVER_ENDPOINT", "127.0.0.1:6443")
     bootstrap_token = os.environ.get("BOOTSTRAP_TOKEN", "")
@@ -157,14 +149,6 @@ def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
         else:
             kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
                 caCertHashes)
-    # kubeadm_join_config["discovery"] = {
-    #     "bootstrapToken": {
-    #         "apiServerEndpoint": os.environ.get("API_SERVER_ENDPOINT", "127.0.0.1:6443"),
-    #         "token": os.environ.get("BOOTSTRAP_TOKEN", ""),
-    #         "unsafeSkipCAVerification": True
-    #     }
-    # }
-    # k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
     kubeadm_join_config["nodeRegistration"] = {
         "criSocket": "unix:///run/containerd/containerd.sock"
     }
