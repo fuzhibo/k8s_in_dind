@@ -9,10 +9,10 @@ set -eu
 : ${CRICTL_TOOL_NEEDED:="false"}
 
 # 对一些参数进行检测，主要是根据版本本身来进行调整
-if [ $K8S_VERSION = 'v1.16.15' ]
-then
-CRICTL_TOOL_NEEDED='true'
-fi
+# if [ $K8S_VERSION = 'v1.16.15' ]
+# then
+# CRICTL_TOOL_NEEDED='true'
+# fi
 
 CONTEXTS=""
 
@@ -31,6 +31,8 @@ fi
 CRICTL_TOOL_CONTEXTS="
 COPY crictl.yaml /etc/crictl.yaml
 COPY crictl-install.sh /usr/local/bin
+RUN chmod +x /usr/local/bin/crictl-install.sh && \
+    /usr/local/bin/crictl-install.sh
 "
 
 if [ $CRICTL_TOOL_NEEDED = 'true' ]
