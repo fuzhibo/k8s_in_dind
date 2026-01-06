@@ -82,6 +82,12 @@ target/
 profile_default/
 ipython_config.py
 
+# vscode
+.vscode/
+
+# claude code
+CLAUDE.md
+claude_code_helper.sh
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
@@ -172,3 +178,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+common/AutoDockerfile_*
