@@ -2,11 +2,21 @@
 set -eu
 
 # Initialize USE_TSINGHUA_APK_SRC with a default value to avoid undefined errors.
-USE_TSINGHUA_APK_SRC="${USE_TSINGHUA_APK_SRC:-true}"
+USE_TSINGHUA_APK_SRC="${USE_TSINGHUA_APK_SRC:-false}"
 
+# Initialize USE_ALIYUN_APK_SRC with a default value.
+USE_ALIYUN_APK_SRC="${USE_ALIYUN_APK_SRC:-false}"
+
+# 支持通过 USE_TSINGHUA_SRC 环境变量来控制（兼容 Dockerfile-base）
+if [ "${USE_TSINGHUA_SRC:-false}" = "false" ]; then
+    USE_TSINGHUA_APK_SRC="false"
+fi
+
+# Change APK mirror to Aliyun source if enabled.
+if [ "$USE_ALIYUN_APK_SRC" = "true" ]; then
+    sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.aliyun.com/alpine#g' /etc/apk/repositories
 # Change APK mirror to Tsinghua University source if enabled.
-# If USE_TSINGHUA_APK_SRC is set to 'true', update the APK repository to use Tsinghua University mirror.
-if [ "$USE_TSINGHUA_APK_SRC" = "true" ]; then
+elif [ "$USE_TSINGHUA_APK_SRC" = "true" ]; then
     sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories
 fi
 
@@ -21,9 +31,28 @@ apk add --no-cache \
 
 # Initialize USE_ALIYUN_PIP_SRC with a default value to avoid undefined errors.
 USE_ALIYUN_PIP_SRC="${USE_ALIYUN_PIP_SRC:-true}"
+USE_TENCENT_PIP_SRC="${USE_TENCENT_PIP_SRC:-false}"
 
+# If USE_TENCENT_PIP_SRC is set to 'true', update the pip source to use Tencent Cloud mirror.
+if [ "$USE_TENCENT_PIP_SRC" = "true" ]; then
+    mkdir -p ~/.pip
+    cat >~/.pip/pip.conf <<EOF
+[global]
+index-url = https://mirrors.cloud.tencent.com/pypi/simple/
+[install]
+trusted-host = mirrors.cloud.tencent.com
+EOF
 # If USE_ALIYUN_PIP_SRC is set to 'true', update the pip source to use Aliyun mirror.
-if [ "$USE_ALIYUN_PIP_SRC" = "true" ]; then
+elif [ "$USE_ALIYUN_PIP_SRC" = "true" ]; then
+    mkdir -p ~/.pip
+    cat >~/.pip/pip.conf <<EOF
+[global]
+index-url = https://mirrors.aliyun.com/pypi/simple/
+[install]
+trusted-host = mirrors.aliyun.com
+EOF
+else
+    # Use USTC mirror as default
     mkdir -p ~/.pip
     cat >~/.pip/pip.conf <<EOF
 [global]

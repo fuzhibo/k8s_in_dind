@@ -100,11 +100,30 @@ K8S_BIN_CONTEXTS="
 $K8S_BIN_CONTEXTS
 $K8S_BIN_EXT_CONTEXTS
 "
+# v1.23.17 及更高版本不需要额外的动态库
 fi
 
 CONTEXTS="$CONTEXTS
 $K8S_BIN_CONTEXTS
 "
+
+# 设置脚本执行权限
+# v1.23.17 及更高版本需要设置脚本执行权限
+CHMOD_CONTEXTS="
+RUN chmod +x /usr/local/bin/k8s-cluster-check.sh && \
+    chmod +x /usr/local/bin/k8s-cluster-create.sh && \
+    chmod +x /usr/local/bin/kubelet-entrypoint.sh && \
+    chmod +x /usr/local/bin/env_configuration_modify.py && \
+    chmod +x /usr/local/bin/preconfig.sh && \
+    chmod +x /usr/local/bin/start.sh
+"
+
+if [ $K8S_VERSION = 'v1.23.17' ] || [[ $K8S_VERSION =~ ^v1\.(2[4-9]|[3-9][0-9])$ ]]
+then
+CONTEXTS="$CONTEXTS
+$CHMOD_CONTEXTS
+"
+fi
 
 # 这里根据是否使用 containerd 作为集群运行时进行相应的配置选择
 

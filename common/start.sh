@@ -26,6 +26,13 @@ else
         sleep 3
     done
 fi
+
+# 预拉取并重新标记 pause 镜像（解决 Docker 从 registry.k8s.io 拉取的问题）
+echo "Pre-pulling pause image from Aliyun registry..."
+IMG_REGISTRY=${KUBEADM_IMG_REGISTRY:-"registry.aliyuncs.com/google_containers"}
+docker pull "${IMG_REGISTRY}/pause:3.6" || echo "Warning: Failed to pull pause image, will try again later..."
+docker tag "${IMG_REGISTRY}/pause:3.6" registry.k8s.io/pause:3.6 || echo "Warning: Failed to tag pause image"
+
 # 这里要进行一些安装检测，如果发现没有安装 kubernetes 集群，就进行安装
 k8s-cluster-check.sh &
 # 然后进行 kubelet 的启动

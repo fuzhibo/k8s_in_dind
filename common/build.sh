@@ -43,5 +43,8 @@ if [ "$K8S_VERSION" = "v1.12.0" ]; then
     rm -rf "$self_path/ld-2.24.so" "$self_path/libc-2.24.so" "$self_path/libdl-2.24.so" "$self_path/libpthread-2.24.so"
 elif [ "$K8S_VERSION" = "v1.16.15" ]; then
     rm -rf "$self_path/ld-2.28.so" "$self_path/libc-2.28.so" "$self_path/libdl-2.28.so" "$self_path/libpthread-2.28.so"
+elif [ "$K8S_VERSION" = "v1.23.17" ]; then
+    # v1.23.17 不需要额外的动态库清理
+    echo "No extra libraries to clean for K8S_VERSION=$K8S_VERSION"
 fi
 cd -
