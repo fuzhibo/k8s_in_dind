@@ -118,7 +118,7 @@ RUN chmod +x /usr/local/bin/k8s-cluster-check.sh && \
     chmod +x /usr/local/bin/start.sh
 "
 
-if [ $K8S_VERSION = 'v1.23.17' ] || [[ $K8S_VERSION =~ ^v1\.(2[4-9]|[3-9][0-9])$ ]]
+if [ "$K8S_VERSION" = 'v1.23.17' ] || echo "$K8S_VERSION" | grep -qE '^v1\.(2[4-9]|[3-9][0-9])$'
 then
 CONTEXTS="$CONTEXTS
 $CHMOD_CONTEXTS

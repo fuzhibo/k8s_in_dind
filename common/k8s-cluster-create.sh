@@ -302,8 +302,9 @@ node_join_workflow() {
         kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml \
             --ignore-preflight-errors=Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
     else
+        # v1.23.17+ 从源码编译时需要忽略 KubeletVersion 检查（版本字符串为 v0.0.0-master）
         kubeadm -v=5 join --config /kubeadm_install/kubeadm_join.yaml \
-            --ignore-preflight-errors=Swap,SystemVerification
+            --ignore-preflight-errors=Swap,SystemVerification,KubeletVersion
     fi
 
     if [ $? -eq 0 ]; then

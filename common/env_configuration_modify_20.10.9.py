@@ -132,10 +132,10 @@ def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
     kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"] = []
     if caCertHashes:
         if "," in caCertHashes:
-            for caCertHash in caCertHashes.split(","):
-                kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(caCertHash)
+            for hash in caCertHashes.split(","):
+                kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(hash)
         else:
-            kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(caCertHash)
+            kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(caCertHashes)
 
     # 不配置 criSocket，使用默认的 dockershim
     # kubeadm_join_config["nodeRegistration"]["criSocket"] = "/var/run/dockershim.sock"

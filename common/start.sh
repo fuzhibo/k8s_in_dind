@@ -16,7 +16,8 @@ dockerd-entrypoint.sh &
 
 if [ $CONTAINERD_INDIVIDUALLY_START = 'true' ]; then
     # 我们需要等待 dockerd 和 containerd 都启动完成
-    while ! [ -e /run/containerd/containerd.sock ] || ! [ -e /var/run/docker.sock ]; do
+    # 注意：在 Docker DinD 中，containerd socket 位于 /run/docker/containerd/containerd.sock
+    while ! [ -e /run/docker/containerd/containerd.sock ] || ! [ -e /var/run/docker.sock ]; do
         echo "Waiting for dockerd and containerd to start..."
         sleep 3
     done
