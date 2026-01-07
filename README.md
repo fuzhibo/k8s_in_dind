@@ -35,6 +35,36 @@ docker run --privileged -d --name test-master -it -e CONTAINERD_INDIVIDUALLY_STA
 # then we can use it to create a node, also the master container ip
 docker run --privileged -d --name test-node -it -e CONTAINERD_INDIVIDUALLY_START="true" -e KUBEADM_JOIN_WORKFLOW="enable" -e ADVERTISE_ADDRESS="<master ip address>" -e API_SERVER_ENDPOINT="<master ip address>:<master port>" -e CA_CERT_HASHES="<kubeadm join ca cert hash>" -v /lib/modules:/lib/modules ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:23.0.5-1.31.7
 
+#### Create cluster 1.23.17 with Flannel (Docker 20.10.9)
+# create a master
+docker run --privileged -d --name test-master \
+  -e CONTAINERD_INDIVIDUALLY_START="true" \
+  -e KUBEADM_INIT_WORKFLOW="enable" \
+  -e KUBEADM_K8S_VERSION="v1.23.17" \
+  -e CNI_CATEGORY="flannel" \
+  -v /lib/modules:/lib/modules \
+  ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:20.10.9-v1.23.17
+
+# get join token and ca cert hash from master
+docker exec test-master kubeadm token create --print-join-command
+
+# create a node (replace TOKEN and CA_HASH with values from above)
+docker run --privileged -d --name test-node \
+  -e CONTAINERD_INDIVIDUALLY_START="true" \
+  -e KUBEADM_JOIN_WORKFLOW="enable" \
+  -e ADVERTISE_ADDRESS="172.17.0.3" \
+  -e API_SERVER_ENDPOINT="<master-ip>:6443" \
+  -e BOOTSTRAP_TOKEN="<token>" \
+  -e CA_CERT_HASHES="<ca-cert-hash>" \
+  -e KUBEADM_K8S_VERSION="v1.23.17" \
+  -v /lib/modules:/lib/modules \
+  ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:20.10.9-v1.23.17
+
+# Note: Flannel images need to be pre-loaded or available in the registry.
+# Flannel CNI plugin images:
+#   - ccr.ccs.tencentyun.com/fuzhibo/flannel-cni-plugin:v1.2.0
+#   - ccr.ccs.tencentyun.com/fuzhibo/flannel:v0.22.1
+
 #### Create cluster 1.16.15 (with cgroup v1)
 # create a master
 docker run --privileged -d --name test-master -e KUBEADM_K8S_VERSION="v1.16.15" -e KUBEADM_INIT_WORKFLOW="enable" -e CNI_VERSION="calico_v3.14" -v $PWD/storage_docker:/var/lib/docker -v /lib/modules:/lib/modules ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:18.09.0-v1.16.15
