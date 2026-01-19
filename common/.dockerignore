@@ -1,0 +1,39 @@
+# Docker 构建忽略文件
+# 排除不需要打包到镜像中的文件和目录
+
+# 项目文档（避免泄露内部信息）
+CLAUDE.md
+README.md
+LICENSE
+*.md
+
+# 版本控制
+.git
+.gitignore
+.gitattributes
+
+# IDE 和编辑器
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 构建产物
+*.log
+*.tmp
+
+# 测试文件
+tests/
+test_*
+*_test.go
+
+# 开发文档
+doc/
+docs/
+
+# 其他不需要的文件
+.env
+.env.*
+*.bak

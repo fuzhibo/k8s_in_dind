@@ -65,6 +65,14 @@ subjects:
     namespace: kube-flannel
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-flannel
+  labels:
+    app: flannel
+    k8s-app: flannel
+    tier: node
 data:
   cni-conf.json: |
     {
@@ -77,12 +85,6 @@ data:
             "hairpinMode": true,
             "isDefaultGateway": true
           }
-        },
-        {
-          "type": "portmap",
-          "capabilities": {
-            "portMappings": true
-          }
         }
       ]
     }
@@ -93,14 +95,6 @@ data:
         "Type": "vxlan"
       }
     }
-kind: ConfigMap
-metadata:
-  labels:
-    app: flannel
-    k8s-app: flannel
-    tier: node
-  name: kube-flannel-cfg
-  namespace: kube-flannel
 ---
 apiVersion: apps/v1
 kind: DaemonSet

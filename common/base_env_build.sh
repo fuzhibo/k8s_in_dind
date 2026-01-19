@@ -29,6 +29,14 @@ apk add --no-cache \
     python3 \
     findutils
 
+# Install CNI plugins (required for Kubernetes networking)
+CNI_PLUGINS_VERSION="v1.1.1"
+CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+curl -sSLO ${CNI_PLUGINS_URL} || curl -sSLO https://ghproxy.com/${CNI_PLUGINS_URL}
+mkdir -p /opt/cni/bin
+tar -xzf cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz -C /opt/cni/bin
+rm -f cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz
+
 # Initialize USE_ALIYUN_PIP_SRC with a default value to avoid undefined errors.
 USE_ALIYUN_PIP_SRC="${USE_ALIYUN_PIP_SRC:-true}"
 USE_TENCENT_PIP_SRC="${USE_TENCENT_PIP_SRC:-false}"

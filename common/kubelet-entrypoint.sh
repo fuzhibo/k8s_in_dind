@@ -13,9 +13,13 @@ for i in $(seq 10)
 do
     if [ $KUBEADM_K8S_VERSION = 'v1.12.0' ] || [ $KUBEADM_K8S_VERSION = 'v1.16.15' ]
     then
-        /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --runtime-cgroups=/k8s/system.slice --pod-infra-container-image registry.aliyuncs.com/google_containers/pause:3.1
+        # 旧版本：添加 --network-plugin=cni 以使用 CNI 网络插件
+        # 如果不配置此参数，kubelet 会使用默认的 cbr0（Docker 网桥）
+        /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --runtime-cgroups=/k8s/system.slice --pod-infra-container-image registry.aliyuncs.com/google_containers/pause:3.1 --network-plugin=cni
     else
-        /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --runtime-cgroups=/k8s/system.slice 
+        # v1.23+ 版本：添加 --network-plugin=cni 以使用 CNI 网络插件
+        # 如果不配置此参数，kubelet 会使用默认的容器运行时网络
+        /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --runtime-cgroups=/k8s/system.slice --network-plugin=cni
     fi
     sleep 3
 done
