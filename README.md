@@ -36,7 +36,17 @@ docker run --privileged -d --name test-master -it -e CONTAINERD_INDIVIDUALLY_STA
 docker run --privileged -d --name test-node -it -e CONTAINERD_INDIVIDUALLY_START="true" -e KUBEADM_JOIN_WORKFLOW="enable" -e ADVERTISE_ADDRESS="<master ip address>" -e API_SERVER_ENDPOINT="<master ip address>:<master port>" -e CA_CERT_HASHES="<kubeadm join ca cert hash>" -v /lib/modules:/lib/modules ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:23.0.5-1.31.7
 
 #### Create cluster 1.23.17 with Flannel (Docker 20.10.9)
-# create a master
+
+Flannel CNI plugin is automatically installed during cluster initialization.
+Multiple Flannel versions are available:
+
+| Flannel Version | CNI_VERSION Value | Description |
+|----------------|-------------------|-------------|
+| v0.22.0 | `flannel_v0.22.0` | Default version, stable |
+| v0.22.1 | `flannel_v0.22.1` | Latest version with latest fixes |
+
+**Create a master with default Flannel (v0.22.1):**
+```bash
 docker run --privileged -d --name test-master \
   -e CONTAINERD_INDIVIDUALLY_START="true" \
   -e KUBEADM_INIT_WORKFLOW="enable" \
@@ -44,6 +54,19 @@ docker run --privileged -d --name test-master \
   -e CNI_CATEGORY="flannel" \
   -v /lib/modules:/lib/modules \
   ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:20.10.9-v1.23.17
+```
+
+**Create a master with specific Flannel version (v0.22.0):**
+```bash
+docker run --privileged -d --name test-master \
+  -e CONTAINERD_INDIVIDUALLY_START="true" \
+  -e KUBEADM_INIT_WORKFLOW="enable" \
+  -e KUBEADM_K8S_VERSION="v1.23.17" \
+  -e CNI_CATEGORY="flannel" \
+  -e CNI_VERSION="flannel_v0.22.0" \
+  -v /lib/modules:/lib/modules \
+  ccr.ccs.tencentyun.com/fuzhibo/k8s-in-dind:20.10.9-v1.23.17
+```
 
 # get join token and ca cert hash from master
 docker exec test-master kubeadm token create --print-join-command
