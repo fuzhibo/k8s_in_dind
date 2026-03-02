@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 import os
+import sys
+import re
 import logging
 import yaml
 
@@ -15,6 +17,73 @@ logger.setLevel(logging.DEBUG)
 KUBEADM_INIT_CONFIG_FILE = "/kubeadm_install/kubeadm_init.yaml"
 KUBEADM_JOIN_CONFIG_FILE = "/kubeadm_install/kubeadm_join.yaml"
 
+# CRI socket 路径
+CONTAINERD_SOCKET = "unix:///run/containerd/containerd.sock"
+DOCKER_SOCKET = "unix:///var/run/dockershim.sock"
+
+
+def get_k8s_version_info():
+    """解析 K8s 版本信息，返回 (major, minor) 元组"""
+    k8s_version = os.environ.get("KUBEADM_K8S_VERSION", "v1.23.17")
+    match = re.match(r"v?(\d+)\.(\d+)", k8s_version)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return 1, 23  # 默认值
+
+
+def get_cri_type():
+    """获取并验证 CRI 类型
+
+    Returns:
+        str: "containerd" 或 "docker"
+
+    Raises:
+        SystemExit: 当 v1.24+ 尝试使用 docker CRI 时
+    """
+    cri_type = os.environ.get("CRI_TYPE", "auto").lower()
+    major, minor = get_k8s_version_info()
+    k8s_version = os.environ.get("KUBEADM_K8S_VERSION", "v1.23.17")
+
+    # v1.24+ 移除了 dockershim
+    if major > 1 or (major == 1 and minor >= 24):
+        if cri_type == "docker":
+            logger.error(
+                f"K8s {k8s_version} does not support docker CRI "
+                f"(dockershim removed in v1.24). Use CRI_TYPE=containerd instead."
+            )
+            sys.exit(1)
+
+    # auto 模式自动选择
+    if cri_type == "auto":
+        if major > 1 or (major == 1 and minor >= 24):
+            selected = "containerd"
+        else:
+            selected = "docker"
+        logger.info(f"CRI_TYPE=auto, selected {selected} for K8s {k8s_version}")
+        return selected
+
+    return cri_type
+
+
+def get_cri_socket(cri_type):
+    """获取 CRI socket 路径
+
+    Args:
+        cri_type: "containerd" 或 "docker"
+
+    Returns:
+        str: CRI socket 路径
+    """
+    if cri_type == "docker":
+        return DOCKER_SOCKET
+    return CONTAINERD_SOCKET
+
+
+# 获取 CRI 类型（全局变量，供后续函数使用）
+_cri_type = get_cri_type()
+_cri_socket = get_cri_socket(_cri_type)
+logger.info(f"CRI_TYPE={_cri_type}, CRI socket={_cri_socket}")
+
 
 def modify_kubeadm_init_config_InitConfiguration(kubeadm_init_config):
     """修改 InitConfiguration 部分"""
@@ -24,8 +93,11 @@ def modify_kubeadm_init_config_InitConfiguration(kubeadm_init_config):
     # 配置 API 地址
     kubeadm_init_config["localAPIEndpoint"]["advertiseAddress"] = "0.0.0.0"
 
-    # 不配置 criSocket，使用默认的 dockershim
-    # kubeadm_init_config["nodeRegistration"]["criSocket"] = "/var/run/dockershim.sock"
+    # 根据 CRI 类型配置 criSocket
+    # docker 模式不配置 criSocket，使用默认的 dockershim
+    if _cri_type == "containerd":
+        kubeadm_init_config["nodeRegistration"]["criSocket"] = _cri_socket
+        logger.info(f"Configured criSocket: {_cri_socket}")
 
     # 配置节点名称
     if hostname == "k8s-master":
@@ -37,7 +109,7 @@ def modify_kubeadm_init_config_InitConfiguration(kubeadm_init_config):
         kubeadm_init_config["nodeRegistration"]["kubeletExtraArgs"] = {}
 
     kubeadm_init_config["nodeRegistration"]["kubeletExtraArgs"]["provider-id"] = \
-        f"k8s-in-dind://docker/k8s-{k8sver}-cluster/k8s-{k8sver}-cluster-control-plane"
+        f"k8s-in-dind://{_cri_type}/k8s-{k8sver}-cluster/k8s-{k8sver}-cluster-control-plane"
 
 
 def modify_kubeadm_init_config_ClusterConfiguration(kubeadm_init_config):
@@ -81,8 +153,12 @@ def modify_kubeadm_init_config_KubeletConfiguration(kubeadm_init_config):
     kubeadm_init_config["cgroupDriver"] = "cgroupfs"  # Docker 使用 cgroupfs
     kubeadm_init_config["imageGCHighThresholdPercent"] = 95
     kubeadm_init_config["imageGCLowThresholdPercent"] = 60
-    # 配置 pause 镜像使用阿里云 registry
-    kubeadm_init_config["pauseImage"] = f"{imgregistry}/pause:3.6"
+
+    # 仅在 docker 模式下配置 pauseImage（containerd 通过 containerd config 配置）
+    if _cri_type == "docker":
+        kubeadm_init_config["pauseImage"] = f"{imgregistry}/pause:3.6"
+        logger.info(f"Configured pauseImage for docker CRI: {kubeadm_init_config['pauseImage']}")
+
     kubeadm_init_config["evictionHard"] = {
         "imagefs.available": "10%",
         "memory.available": "200Mi",
@@ -137,8 +213,11 @@ def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
         else:
             kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(caCertHashes)
 
-    # 不配置 criSocket，使用默认的 dockershim
-    # kubeadm_join_config["nodeRegistration"]["criSocket"] = "/var/run/dockershim.sock"
+    # 根据 CRI 类型配置 criSocket
+    # docker 模式不配置 criSocket，使用默认的 dockershim
+    if _cri_type == "containerd":
+        kubeadm_join_config["nodeRegistration"]["criSocket"] = _cri_socket
+        logger.info(f"Configured criSocket: {_cri_socket}")
 
     # 配置节点名称
     hostname = os.environ.get("HOSTNAME", "k8s-node")

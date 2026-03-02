@@ -1,0 +1,13 @@
+# Test Framework
+pytest>=7.0.0
+pytest-timeout>=2.2.0
+pytest-xdist>=3.0.0
+
+# Docker Integration
+docker>=6.0.0
+
+# Kubernetes Integration
+kubernetes>=28.0.0
+
+# Utilities
+pyyaml>=6.0

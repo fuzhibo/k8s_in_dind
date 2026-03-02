@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 import json
+import re
 import tomli
 import tomli_w
 import yaml
@@ -16,13 +17,70 @@ formatter = logging.Formatter(
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
+
 # 修改相关组件的配置信息
 CONTAINERD_CONFIG_FILE = "/etc/containerd/config.toml"
-if not os.path.exists(CONTAINERD_CONFIG_FILE):
-    logger.error(f"containerd config file {CONTAINERD_CONFIG_FILE} not found")
-    sys.exit(1)
+CONTAINERD_SOCKET = "unix:///run/containerd/containerd.sock"
+DOCKER_SOCKET = "unix:///var/run/dockershim.sock"
 
 pause_image = "registry.aliyuncs.com/google_containers/pause:3.9"
+
+
+def get_k8s_version_info():
+    """解析 K8s 版本信息，返回 (major, minor) 元组"""
+    k8s_version = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
+    match = re.match(r"v?(\d+)\.(\d+)", k8s_version)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return 1, 31  # 默认值
+
+
+def get_cri_type():
+    """获取并验证 CRI 类型
+
+    Returns:
+        str: "containerd" 或 "docker"
+
+    Raises:
+        SystemExit: 当 v1.24+ 尝试使用 docker CRI 时
+    """
+    cri_type = os.environ.get("CRI_TYPE", "auto").lower()
+    major, minor = get_k8s_version_info()
+    k8s_version = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
+
+    # v1.24+ 移除了 dockershim
+    if major > 1 or (major == 1 and minor >= 24):
+        if cri_type == "docker":
+            logger.error(
+                f"K8s {k8s_version} does not support docker CRI "
+                f"(dockershim removed in v1.24). Use CRI_TYPE=containerd instead."
+            )
+            sys.exit(1)
+
+    # auto 模式自动选择
+    if cri_type == "auto":
+        if major > 1 or (major == 1 and minor >= 24):
+            selected = "containerd"
+        else:
+            selected = "docker"
+        logger.info(f"CRI_TYPE=auto, selected {selected} for K8s {k8s_version}")
+        return selected
+
+    return cri_type
+
+
+def get_cri_socket(cri_type):
+    """获取 CRI socket 路径
+
+    Args:
+        cri_type: "containerd" 或 "docker"
+
+    Returns:
+        str: CRI socket 路径
+    """
+    if cri_type == "docker":
+        return DOCKER_SOCKET
+    return CONTAINERD_SOCKET
 
 
 def modify_contaienrd_config_version2(config):
@@ -33,26 +91,37 @@ def modify_contaienrd_config_version2(config):
     # config["plugins"]['io.containerd.grpc.v1.cri']["containerd"]["runtimes"]["runc"]["options"]["SystemdCgroup"] = True
 
 
-logger.info(f"Begin to config containerd config file {CONTAINERD_CONFIG_FILE}")
-containerd_config = None
-# 开始进行配置
-with open(CONTAINERD_CONFIG_FILE, "rb") as fp:
-    containerd_config = tomli.load(fp)
-    logger.debug(json.dumps(containerd_config, indent=4))
-    # 根据版本进行修改
-    if containerd_config["version"] == 2:
-        modify_contaienrd_config_version2(containerd_config)
-    else:
-        logger.error(
-            f"containerd config file {CONTAINERD_CONFIG_FILE} version {containerd_config['version']} not supported")
+# 获取 CRI 类型（在 containerd 配置之前，用于决定是否配置 containerd）
+_cri_type = get_cri_type()
+_cri_socket = get_cri_socket(_cri_type)
+logger.info(f"CRI_TYPE={_cri_type}, CRI socket={_cri_socket}")
+
+# 仅在使用 containerd 时配置 containerd
+if _cri_type == "containerd":
+    if not os.path.exists(CONTAINERD_CONFIG_FILE):
+        logger.error(f"containerd config file {CONTAINERD_CONFIG_FILE} not found")
         sys.exit(1)
 
-if containerd_config is not None:
-    with open(CONTAINERD_CONFIG_FILE, "wb") as fp:
-        tomli_w.dump(containerd_config, fp)
-        fp.flush()
-        # 强制同步数据到磁盘
-        os.fsync(fp.fileno())
+    logger.info(f"Begin to config containerd config file {CONTAINERD_CONFIG_FILE}")
+    containerd_config = None
+    # 开始进行配置
+    with open(CONTAINERD_CONFIG_FILE, "rb") as fp:
+        containerd_config = tomli.load(fp)
+        logger.debug(json.dumps(containerd_config, indent=4))
+        # 根据版本进行修改
+        if containerd_config["version"] == 2:
+            modify_contaienrd_config_version2(containerd_config)
+        else:
+            logger.error(
+                f"containerd config file {CONTAINERD_CONFIG_FILE} version {containerd_config['version']} not supported")
+            sys.exit(1)
+
+    if containerd_config is not None:
+        with open(CONTAINERD_CONFIG_FILE, "wb") as fp:
+            tomli_w.dump(containerd_config, fp)
+            fp.flush()
+            # 强制同步数据到磁盘
+            os.fsync(fp.fileno())
 
 # 修改 kubeadmin init 或者 join 的配置文件
 KUBEADM_INIT_CONFIG_FILE = "/kubeadm_install/kubeadm_init.yaml"
@@ -61,15 +130,17 @@ KUBEADM_JOIN_CONFIG_FILE = "/kubeadm_install/kubeadm_join.yaml"
 
 def modify_kubeadm_init_config_InitConfiguration(kubeadm_init_config):
     kubeadm_init_config["localAPIEndpoint"]["advertiseAddress"] = "0.0.0.0"
-    kubeadm_init_config["nodeRegistration"]["criSocket"] = "unix:///run/containerd/containerd.sock"
+    # 根据 CRI 类型配置 criSocket
+    kubeadm_init_config["nodeRegistration"]["criSocket"] = _cri_socket
     # 这里我们直接用 hostname 作为 node name
     hostname = os.environ.get("HOSTNAME", "k8s-master")
     if hostname == "k8s-master":
         logger.warning(
             f"Will use default node name {hostname} as this node name.")
     kubeadm_init_config["nodeRegistration"]["name"] = hostname
-    k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
-    kubeadm_init_config["provider-id"] = f"k8s-in-dind://containerd/k8s-{k8sver}-cluster/k8s-{k8sver}-cluster-control-plane"
+    # provider-id 字段在 K8s v1.31 中已不支持，移除
+    # k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
+    # kubeadm_init_config["provider-id"] = f"k8s-in-dind://{_cri_type}/k8s-{k8sver}-cluster/k8s-{k8sver}-cluster-control-plane"
     kubeadm_init_config["skipPhases"] = ["preflight"]
 
 
@@ -84,12 +155,11 @@ def modify_kubeadm_init_config_ClusterConfiguration(kubeadm_init_config):
     certSANs.append(hostname)
     kubeadm_init_config["apiServer"]["certSANs"] = certSANs
     if "extraArgs" not in kubeadm_init_config["apiServer"]:
-        kubeadm_init_config["apiServer"]["extraArgs"] = []
-    kubeadm_init_config["apiServer"]["extraArgs"].append(
-        {"name": "authorization-mode", "value": "Node,RBAC"})
-    kubeadm_init_config["apiServer"]["extraArgs"].append(
-        {"name": "enable-aggregator-routing", "value": "true"})
-    kubeadm_init_config["controllerManager"]["enable-hostpath-provisioner"] = "true"
+        kubeadm_init_config["apiServer"]["extraArgs"] = {}
+    kubeadm_init_config["apiServer"]["extraArgs"]["authorization-mode"] = "Node,RBAC"
+    kubeadm_init_config["apiServer"]["extraArgs"]["enable-aggregator-routing"] = "true"
+    # enable-hostpath-provisioner 字段在 K8s v1.31 中已不支持，移除
+    # kubeadm_init_config["controllerManager"]["enable-hostpath-provisioner"] = "true"
     k8sver = os.environ.get("KUBEADM_K8S_VERSION", "v1.31.7")
     imgregistry = os.environ.get(
         "KUBEADM_IMG_REGISTRY", "registry.aliyuncs.com/google_containers")
@@ -149,10 +219,14 @@ def modify_kubeadm_join_config_JoinConfiguration(kubeadm_join_config):
         else:
             kubeadm_join_config["discovery"]["bootstrapToken"]["caCertHashes"].append(
                 caCertHashes)
+    # 根据 CRI 类型配置 criSocket
     kubeadm_join_config["nodeRegistration"] = {
-        "criSocket": "unix:///run/containerd/containerd.sock"
+        "criSocket": _cri_socket
     }
     kubeadm_join_config["skipPhases"] = ["preflight"]
+    # 设置 tlsBootstrapToken，使用与 discovery token 相同的值
+    if bootstrap_token:
+        kubeadm_join_config["tlsBootstrapToken"] = bootstrap_token
 
 
 # 获取环境变量
