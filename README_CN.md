@@ -7,6 +7,7 @@
 ## 项目简介
 
 k8s-in-dind 允许您在 Docker 容器内运行完整的 Kubernetes 集群。适用于：
+
 - CI/CD 流水线测试
 - 开发环境
 - Kubernetes 学习和实验
@@ -263,6 +264,7 @@ docker exec test-master kubectl get nodes
 ```
 
 **恢复提示：**
+
 - 先启动 Master 节点，再启动 Worker 节点
 - Master 恢复需要 30-60 秒，Worker 额外需要 30 秒
 - 确保重启后静态 IP 保持不变
@@ -402,4 +404,4 @@ bash -x ./common/build.sh
 
 ## 许可证
 
-MIT License
+GPL-3.0 License

@@ -7,6 +7,7 @@ Run Kubernetes clusters inside Docker-in-Docker containers. **For testing purpos
 ## Overview
 
 k8s-in-dind allows you to run complete Kubernetes clusters inside Docker containers. It's perfect for:
+
 - CI/CD pipeline testing
 - Development environments
 - Kubernetes learning and experimentation
@@ -263,6 +264,7 @@ docker exec test-master kubectl get nodes
 ```
 
 **Recovery tips:**
+
 - Start master node first, then worker nodes
 - Recovery takes 30-60 seconds for master, additional 30 seconds for workers
 - Ensure static IP is preserved after restart
@@ -402,4 +404,4 @@ bash -x ./common/build.sh
 
 ## License
 
-MIT License
+GPL-3.0 License
